@@ -50,6 +50,8 @@ h2{font-size:1.1rem;margin:16px 0 8px}
 .opt span{font-size:.9rem;font-weight:700}
 .opt.txt{min-height:92px}
 .opt.txt span{font-size:1.2rem}
+.opt .lt{font-size:2.6rem;font-weight:800;direction:ltr}
+.opt.txt span.lt{font-size:2.6rem}
 .opts.two{grid-template-columns:repeat(2,1fr)}
 .opt.good{background:var(--ok);border-color:var(--pri)}
 .opt.bad{background:var(--no);border-color:var(--bad)}
@@ -152,6 +154,7 @@ function home(){
  <div class="hero"><div class="chick">🐥</div><div class="bubble">${done?`باغ تو ${done} گل کامل دارد! ادامه بده.`:'سلام! بیا باغ کلمه‌ها را با هم پر از گل کنیم.'}</div></div>
  <div class="garden">${WORDS.map(x=>`<span title="${x.w}">${FLOWER[P(x.w).p]}</span>`).join('')}</div>
  <div style="text-align:center;color:var(--soft);font-size:.9rem;margin-top:4px">${done} از ${total} گل کامل</div>
+ ${LESSON.song?`<button class="ghost" style="width:100%;margin-top:10px" onclick="abcSong()">🎵 الفبا را به ترتیب بشنو</button>`:''}
  ${rs?`<button class="m" style="border-color:var(--pri);margin:12px 0 0" onclick="resume_()"><span class="e">▶️</span><span class="t">ادامه‌ی مأموریت: ${esc(rs.title)}<small>گام ${rs.i+1} از ${rs.steps.length}</small></span></button>`:''}
  <h2>مأموریت‌ها</h2>
  <div class="missions">
@@ -170,7 +173,8 @@ function start(id){
  }else{const m=MISSIONS.find(m=>m.id===id);words=m.words.slice();title=m.title}
  const steps=[];
  words.forEach(w=>{steps.push({t:'learn',w});steps.push({t:'quick',w})});
- const seqs=words.map(w=>{const n=units(BY[w]).length,s=slopes(n);
+ const seqs=words.map(w=>{if(BY[w].lt)return [{t:'lmatch',w,d:'ul'},{t:'listen',w},{t:'lmatch',w,d:'lu'},{t:'dict',w}];
+  const n=units(BY[w]).length,s=slopes(n);
   return [{t:'read',w}].concat(s.f.map(k=>({t:'fill',w,k})),[{t:'fill',w,k:n}],s.t.map(k=>({t:'tfill',w,k})),[{t:'dict',w}])});
  const mx=Math.max(...seqs.map(a=>a.length));
  for(let r=0;r<mx;r++)shuffle(seqs).forEach(a=>{if(a[r])steps.push(a[r])});
@@ -191,6 +195,8 @@ function next(){game.i++;if(game.i>=game.steps.length)finish();else{snap();step(
 
 function step(keep){
  const s=game.steps[game.i],x=BY[s.w];
+ if(x.lt&&(s.t==='quick'||s.t==='listen'))return lhear(s,x,keep);
+ if(x.lt&&s.t==='lmatch')return lmatch(x,s.d,keep);
  if(s.t==='learn')return learn(x,keep);
  if(s.t==='listen'||s.t==='read'||s.t==='quick')return mc(s,x,keep);
  if(s.t==='fill')return fillStart(x,s.k,keep);
@@ -200,6 +206,7 @@ function step(keep){
 
 /* پله ۱: ببین و بشنو */
 function learn(x,keep){
+ if(x.lt)return learnLetter(x,keep);
  $('#app').innerHTML=topbar()+bubble('نگاه کن، گوش بده، بعد بلند تکرار کن 🗣️')+`
  <div class="card">${pic(x)}<div class="word" dir="ltr">${fmt(x)}</div><div class="fa${x.e?'':' big'}">${x.fa}</div>${x.note?`<div style="color:var(--soft);font-size:.9rem;margin-top:6px">${x.note}</div>`:''}
  <div class="row"><button class="acc" onclick="${SW(x)}">🔊 بشنو</button></div></div>
@@ -325,10 +332,63 @@ function tfillCheck(){
  try{$('#inp').focus()}catch(e){}
 }
 
+/* ---------- الفبا: حرف بزرگ/کوچک، نام حرف، تشخیص شنیداری ---------- */
+const CONF={b:'d',d:'b',p:'q',q:'p',m:'n',n:'m',u:'v',v:'u',i:'l',l:'i',g:'q',h:'n',w:'v',c:'e',e:'c'};
+function learnLetter(x,keep){
+ const ex=x.ex;let exw='';
+ if(ex){const i=ex[0].toLowerCase().indexOf(x.w.toLowerCase());
+  exw=i<0?esc(ex[0]):esc(ex[0].slice(0,i))+'<span style="color:var(--bad)">'+esc(ex[0].slice(i,i+1))+'</span>'+esc(ex[0].slice(i+1))}
+ $('#app').innerHTML=topbar()+bubble('این حرف را ببین و اسمش را بشنو. بلند تکرار کن 🗣️')+`
+ <div class="card"><div class="word" style="font-size:5.5rem;margin:0">${x.s}</div><div class="fa">تلفظ: ${x.fa}</div>
+ <div class="row"><button class="acc" onclick="${SW(x)}">🔊 اسم حرف</button></div>
+ ${ex?`<div style="margin-top:14px;border-top:2px dashed #efe6cc;padding-top:12px">${ex[1]?`<div style="font-size:3.2rem;line-height:1.2">${ex[1]}</div>`:''}
+ <div class="word" dir="ltr" style="font-size:2rem;margin:4px 0">${exw}</div><div class="fa" style="font-size:1.1rem">${ex[2]}</div>
+ <button class="ghost" style="margin-top:6px" onclick="say('${ex[0]}')">🔊 ${ex[0]}</button></div>`:''}</div>
+ <div class="row"><button onclick="next()" style="width:100%">بلند گفتم، بعدی ←</button></div>`;
+ if(!keep)setTimeout(()=>sayW(x.w),350);
+}
+function letterPool(x,n,conf){
+ const same=game.words.filter(w=>w!==x.w&&BY[w].lt);
+ const c=conf&&CONF[x.w.toLowerCase()]?CONF[x.w.toLowerCase()].toUpperCase():null;
+ const all=WORDS.filter(a=>a.lt).map(a=>a.w).filter(w=>w!==x.w);
+ const pool=[];if(c&&BY[c])pool.push(c);
+ shuffle(same).concat(shuffle(all)).forEach(w=>{if(!pool.includes(w))pool.push(w)});
+ return shuffle([x.w].concat(pool.slice(0,n-1)));
+}
+function lhear(s,x,keep){
+ const quick=s.t==='quick';
+ const opts=letterPool(x,quick?2:3,!quick);
+ game.cur={opts,err:0};
+ $('#app').innerHTML=topbar()+bubble(quick?'همین الان یاد گرفتی! کدام حرف را شنیدی؟ 🧠':'گوش کن! کدام حرف است؟ 👂')+`
+ <div class="card"><button class="acc" style="font-size:1.6rem;min-height:80px;width:100%" onclick="${SW(x)}">🔊 دوباره بشنو</button></div>
+ <div class="opts${opts.length<3?' two':''}">${opts.map((w,i)=>`<button class="opt txt" id="o${i}" onclick="pick(${i})"><span class="lt">${BY[w].s}</span></button>`).join('')}</div>
+ <div class="msg" id="msg"></div>`;
+ if(!keep)setTimeout(()=>sayW(x.w),400);
+}
+function lmatch(x,d,keep){
+ const opts=letterPool(x,3,true);
+ game.cur={opts,err:0};
+ const f=w=>d==='ul'?w.toLowerCase():w.toUpperCase();
+ const q=d==='ul'?x.w:x.w.toLowerCase();
+ $('#app').innerHTML=topbar()+bubble(d==='ul'?'این حرف بزرگ است. حرف کوچکش کدام است؟ 🔠':'این حرف کوچک است. حرف بزرگش کدام است؟ 🔡')+`
+ <div class="card"><div class="word" style="font-size:5rem;margin:0">${q}</div><button class="ghost" onclick="${SW(x)}">🔊</button></div>
+ <div class="opts">${opts.map((w,i)=>`<button class="opt txt" id="o${i}" onclick="pick(${i})"><span class="lt">${f(w)}</span></button>`).join('')}</div>
+ <div class="msg" id="msg"></div>`;
+}
+function abcSong(){
+ if(!('speechSynthesis' in window)){toast('این مرورگر صدای انگلیسی ندارد.');return}
+ try{speechSynthesis.cancel()}catch(e){}
+ const L=WORDS.filter(x=>x.lt);let i=0;
+ const voice=speechSynthesis.getVoices().find(v=>/^en[-_]US/i.test(v.lang))||speechSynthesis.getVoices().find(v=>/^en/i.test(v.lang));
+ const go=()=>{if(i>=L.length)return;const u=new SpeechSynthesisUtterance(L[i].say||L[i].w);u.lang='en-US';u.rate=save.settings.slow?0.6:0.9;if(voice)u.voice=voice;
+  u.onend=()=>{i++;setTimeout(go,300)};speechSynthesis.speak(u)};
+ go();
+}
+
 /* پله ۵: املای شنیداری */
 function dict(x,keep){
  game.cur={att:0,copy:false};
- $('#app').innerHTML=topbar()+bubble('گوش کن و کلمه را بنویس ✍️')+`
+ $('#app').innerHTML=topbar()+bubble(x.lt?'گوش کن و حرف را بنویس ✍️':'گوش کن و کلمه را بنویس ✍️')+`
  <div class="card"><button class="acc" style="font-size:1.6rem;min-height:80px;width:100%" onclick="${SW(x)}">🔊 بشنو</button>
  <div class="blanks" id="bl"></div>
  <input class="txt" id="inp" type="text" dir="ltr" lang="en" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="املا">

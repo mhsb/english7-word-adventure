@@ -2,11 +2,129 @@
    برای افزودن درس جدید، یک آبجکت مثل درس‌های زیر به LESSONS اضافه کن.
    W(املا, هجاها, معنی فارسی, تصویر[ایموجی], گزینه‌ها)
    تصویر خالی ('') = کلمه‌ی مفهومی که تصویر مناسب ندارد؛ تمرین‌هایش با گزینه‌های ترجمه‌ی فارسی انجام می‌شود (نه تصویر).
-   گزینه‌ها: ph:1 = عبارت چندکلمه‌ای (مرحله‌ی چیدن حرف ندارد)، num:1 = تصویر عددی/متنی، say = تلفظ دلخواه، note = توضیح کوتاه */
+   گزینه‌ها: lt:1 = حرف الفبا (با LT ساخته می‌شود)، ph:1 = عبارت چندکلمه‌ای (مرحله‌ی چیدن حرف ندارد)، num:1 = تصویر عددی/متنی، say = تلفظ دلخواه، note = توضیح کوتاه */
 const W=(w,s,fa,e,o)=>Object.assign({w,s,fa,e},o||{});
 const M=(id,title,e,words)=>({id,title,e,words});
+const LT=(c,say,fa,ex)=>({w:c,s:c+c.toLowerCase(),fa,e:'',lt:1,say,ex});
 
 const LESSONS=[
+
+/* ---------------- الفبا (قبل از درس ۱) ---------------- */
+{id:'abc',title:'الفبا',sub:'حرف‌های انگلیسی',e:'🔤',song:true,
+words:[
+LT('A','ay','اِی',['Apple','🍎','سیب']),
+LT('B','bee','بی',['Boy','👦','پسر']),
+LT('C','see','سی',['Chair','🪑','صندلی']),
+LT('D','dee','دی',['Door','🚪','در']),
+LT('E','ee','ای',['Eraser','','پاک‌کن']),
+LT('F','eff','اِف',['Friend','🧑‍🤝‍🧑','دوست']),
+LT('G','jee','جی',['Girl','👧','دختر']),
+LT('H','aitch','اِیچ',['House','🏠','خانه']),
+LT('I','eye','آی',['Ice-cream','🍦','بستنی']),
+LT('J','jay','جِی',['Juice','🧃','آبمیوه']),
+LT('K','kay','کِی',['Kebab','🍢','کباب']),
+LT('L','ell','اِل',['Library','📚','کتابخانه']),
+LT('M','em','اِم',['Man','👨','مرد']),
+LT('N','en','اِن',['Name','🏷️','نام']),
+LT('O','oh','اُ',['Orange','🍊','پرتقال']),
+LT('P','pee','پی',['Pen','🖊️','خودکار']),
+LT('Q','cue','کیو',['Quince','','به']),
+LT('R','are','آر',['Ruler','📏','خط‌کش']),
+LT('S','ess','اِس',['Student','🧑‍🎓','دانش‌آموز']),
+LT('T','tee','تی',['Teacher','👩‍🏫','معلم']),
+LT('U','you','یو',['Uncle','','عمو / دایی']),
+LT('V','vee','وی',['Visit','','دیدار کردن']),
+LT('W','double you','دابلیو',['Woman','👩','زن']),
+LT('X','ex','اِکس',['Six','6','شش']),
+LT('Y','why','وای',['Yellow','🟡','زرد']),
+LT('Z','zed','زِد',['Zucchini','','کدو سبز'])
+],
+missions:[
+M('a1','حرف‌های A تا D','🔤',['A','B','C','D']),
+M('a2','حرف‌های E تا H','🔡',['E','F','G','H']),
+M('a3','حرف‌های I تا L','🔠',['I','J','K','L']),
+M('a4','حرف‌های M تا P','🔤',['M','N','O','P']),
+M('a5','حرف‌های Q تا T','🔡',['Q','R','S','T']),
+M('a6','حرف‌های U تا X','🔠',['U','V','W','X']),
+M('a7','حرف‌های Y و Z','🔤',['Y','Z']),
+M('s1','حرف‌های شبیه ۱','👀',['B','D','P','Q']),
+M('s2','حرف‌های شبیه ۲','👀',['M','N','U','V'])
+]},
+
+/* ---------------- Welcome ---------------- */
+{id:'w',title:'Welcome',sub:'خوش‌آمدید',e:'🎉',
+words:[
+W('Hotel','Ho·tel','هتل','🏨'),
+W('Post','Post','پست','📮'),
+W('Football','Foot·ball','فوتبال','⚽'),
+W('Ambulance','Am·bu·lance','آمبولانس','🚑'),
+W('Iran','I·ran','ایران','🇮🇷'),
+W('CD','C·D','سی‌دی','💿',{say:'C D'}),
+W('Start','Start','شروع','▶️'),
+W('Bank','Bank','بانک','🏦'),
+W('Police','Po·lice','پلیس','👮'),
+W('Delete','De·lete','حذف کردن','',{}),
+W('Bus','Bus','اتوبوس','🚌'),
+W('Taxi','Tax·i','تاکسی','🚕'),
+W('Stop','Stop','ایست / توقف','🛑'),
+W('SMS','S·M·S','پیامک','',{say:'S M S'}),
+W('One','One','یک','1',{num:1}),
+W('Two','Two','دو','2',{num:1}),
+W('Three','Three','سه','3',{num:1}),
+W('Four','Four','چهار','4',{num:1}),
+W('Five','Five','پنج','5',{num:1}),
+W('Six','Six','شش','6',{num:1}),
+W('Seven','Sev·en','هفت','7',{num:1}),
+W('Eight','Eight','هشت','8',{num:1}),
+W('Nine','Nine','نه','9',{num:1}),
+W('Ten','Ten','ده','10',{num:1}),
+W('Yellow','Yel·low','زرد','🟡'),
+W('White','White','سفید','⚪'),
+W('Green','Green','سبز','🟢'),
+W('Black','Black','سیاه','⚫'),
+W('Blue','Blue','آبی','🔵'),
+W('Red','Red','قرمز','🔴'),
+W('School','School','مدرسه','🏫'),
+W('Classroom','Class·room','کلاس درس','',{}),
+W('Door','Door','در','🚪'),
+W('Blackboard','Black·board','تخته سیاه','',{}),
+W('Desk','Desk','میز (تحریر)','',{}),
+W('Chair','Chair','صندلی','🪑'),
+W('Pen','Pen','خودکار','🖊️'),
+W('Pencil','Pen·cil','مداد','✏️'),
+W('Book','Book','کتاب','📖'),
+W('Notebook','Note·book','دفتر','📓'),
+W('Ruler','Rul·er','خط‌کش','📏'),
+W('Dictionary','Dic·tion·ar·y','فرهنگ لغت','',{}),
+W('Eraser','E·ras·er','پاک‌کن','',{}),
+W('Bag','Bag','کیف','👜'),
+W('Pencil sharpener','Pencil sharpener','مدادتراش','',{ph:1}),
+W('Backpack','Back·pack','کوله‌پشتی','🎒'),
+W('Marker','Mark·er','ماژیک','',{}),
+W('Bench','Bench','نیمکت','',{}),
+W('Pencil case','Pencil case','جامدادی','',{ph:1}),
+W('Chalk','Chalk','گچ','',{}),
+W("What's your name please","What's your name, please?",'اسم تو چیست؟','',{ph:1}),
+W("My name's Ali","My name's Ali",'اسم من علی است','',{ph:1})
+],
+missions:[
+M('w1','کلمه‌های آشنا ۱','🏨',['Hotel','Post','Football','Ambulance']),
+M('w2','کلمه‌های آشنا ۲','🇮🇷',['Iran','CD','Start','Bank']),
+M('w3','کلمه‌های آشنا ۳','🚌',['Police','Delete','Bus','Taxi']),
+M('w4','کلمه‌های آشنا ۴','🛑',['Stop','SMS']),
+M('n1','عددها ۱ تا ۴','1️⃣',['One','Two','Three','Four']),
+M('n2','عددها ۵ تا ۸','5️⃣',['Five','Six','Seven','Eight']),
+M('n3','نه و ده','🔟',['Nine','Ten']),
+M('c1','رنگ‌ها ۱','🎨',['Yellow','White','Green']),
+M('c2','رنگ‌ها ۲','🖍️',['Black','Blue','Red']),
+M('o1','کلاس ۱','🏫',['School','Classroom','Door','Blackboard']),
+M('o2','کلاس ۲','🪑',['Desk','Chair','Pen','Pencil']),
+M('o3','کلاس ۳','📖',['Book','Notebook','Ruler','Dictionary']),
+M('o4','کلاس ۴','🎒',['Eraser','Bag','Pencil sharpener','Backpack']),
+M('o5','کلاس ۵','📏',['Marker','Bench','Pencil case','Chalk']),
+M('g1','آشنایی با هم‌کلاسی','🤝',["What's your name please","My name's Ali"])
+]},
+
 
 /* ---------------- درس ۱: My Name ---------------- */
 {id:'l1',title:'درس ۱',sub:'اسم من',e:'👋',
