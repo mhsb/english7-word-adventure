@@ -95,6 +95,7 @@ const $=s=>document.querySelector(s);
 const C=['#e4572e','#2f9e7a','#3a6ea5','#9d4edd'];
 
 /* داده‌ی درس‌ها در lessons.js */
+LESSONS.forEach(l=>l.words.forEach(x=>{x._l=l.id}));
 let LESSON=null,WORDS=[],BY={},MISSIONS=[];
 function setLesson(id){LESSON=LESSONS.find(l=>l.id===id);WORDS=LESSON.words;BY=Object.fromEntries(WORDS.map(x=>[x.w,x]));MISSIONS=LESSON.missions;save.last=id;persist()}
 
@@ -104,7 +105,7 @@ function loadSave(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&d.pr
  return{prog:{},stars:{},settings:{sound:true,syl:true,slow:true},unlockAll:false}}
 let save=loadSave();
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(save))}catch(e){}}
-const PK=w=>LESSON.id+':'+w;
+const PK=w=>((BY[w]&&BY[w]._l)||LESSON.id)+':'+w;
 const SK=id=>LESSON.id+':'+id;
 const P=w=>save.prog[PK(w)]||(save.prog[PK(w)]={p:0,seen:0});
 const FLOWER=['🌱','🌿','🌷','🌸'];
@@ -147,6 +148,8 @@ function home(){
  const unlocked=i=>i===0||save.unlockAll||(save.stars[SK(MISSIONS[i-1].id)]||0)>0;
  const weak=WORDS.filter(x=>P(x.w).seen>0&&P(x.w).p<3);
  const rs=save.resume&&save.resume.l===LESSON.id?save.resume.g:null;
+ const rp=reviewPlan(),canRev=rp.A.length+rp.B.length>0,revToday=((save.revDone||{})[LESSON.id])===new Date().toDateString();
+ const revCard=`<button class="m" style="border-color:var(--acc);margin:12px 0 0" ${canRev?'onclick="startRev()"':'disabled'}><span class="e">🔁</span><span class="t">مرور درس‌های قبل و اشتباه‌ها<small>${canRev?(revToday?'✅ امروز انجام شد؛ می‌توانی دوباره مرور کنی':'پیشنهاد امروز: '+(rp.A.length?rp.A.length+' کلمه از درس‌های قبل':'')+(rp.A.length&&rp.B.length?' و ':'')+(rp.B.length?rp.B.length+' اشتباه قبلی':'')):'بعد از چند مأموریت باز می‌شود'}</small></span></button>`;
  $('#app').innerHTML=`
  <div class="top"><button class="ghost icon" onclick="lessons()" aria-label="درس‌ها">📚</button><h1 style="flex:1">${LESSON.title}: ${LESSON.sub}</h1>
   <button class="ghost icon" onclick="toggleSound()" aria-label="صدا">${save.settings.sound?'🔊':'🔇'}</button>
@@ -156,11 +159,12 @@ function home(){
  <div style="text-align:center;color:var(--soft);font-size:.9rem;margin-top:4px">${done} از ${total} گل کامل</div>
  ${LESSON.song?`<button class="ghost" style="width:100%;margin-top:10px" onclick="abcSong()">🎵 الفبا را به ترتیب بشنو</button>`:''}
  ${rs?`<button class="m" style="border-color:var(--pri);margin:12px 0 0" onclick="resume_()"><span class="e">▶️</span><span class="t">ادامه‌ی مأموریت: ${esc(rs.title)}<small>گام ${rs.i+1} از ${rs.steps.length}</small></span></button>`:''}
+ ${revCard}
  <h2>مأموریت‌ها</h2>
  <div class="missions">
  ${MISSIONS.map((m,i)=>{const s=save.stars[SK(m.id)]||0,u=unlocked(i);
   return `<button class="m ${u?'':'locked'}" ${u?`onclick="start('${m.id}')"`:'disabled'}><span class="e">${u?m.e:'🔒'}</span><span class="t">${m.title}<small>${m.words.length} کلمه</small></span><span class="stars">${'⭐'.repeat(s)}${'☆'.repeat(3-s)}</span></button>`}).join('')}
- <button class="m" style="border-color:var(--acc)" ${weak.length?`onclick="start('review')"`:'disabled'}><span class="e">🔁</span><span class="t">مرور هوشمند<small>${weak.length?'کلمه‌هایی که هنوز گل کامل نشده‌اند':'بعد از اولین مأموریت باز می‌شود'}</small></span></button>
+ <button class="m" style="border-color:var(--acc)" ${weak.length?`onclick="start('review')"`:'disabled'}><span class="e">🔁</span><span class="t">مرور همین درس<small>${weak.length?'کلمه‌هایی که هنوز گل کامل نشده‌اند':'بعد از اولین مأموریت باز می‌شود'}</small></span></button>
  </div>`;
 }
 function toggleSound(){save.settings.sound=!save.settings.sound;persist();home()}
@@ -169,7 +173,7 @@ function toggleSound(){save.settings.sound=!save.settings.sound;persist();home()
 function start(id){
  let words,title;
  if(id==='review'){
-  words=WORDS.filter(x=>P(x.w).seen>0&&P(x.w).p<3).sort((a,b)=>P(a.w).p-P(b.w).p).slice(0,5).map(x=>x.w);title='مرور هوشمند'
+  words=WORDS.filter(x=>P(x.w).seen>0&&P(x.w).p<3).sort((a,b)=>((P(b.w).m||0)-(P(a.w).m||0))||(P(a.w).p-P(b.w).p)).slice(0,5).map(x=>x.w);title='مرور هوشمند'
  }else{const m=MISSIONS.find(m=>m.id===id);words=m.words.slice();title=m.title}
  const steps=[];
  words.forEach(w=>{steps.push({t:'learn',w});steps.push({t:'quick',w})});
@@ -178,7 +182,7 @@ function start(id){
   return [{t:'read',w}].concat(s.f.map(k=>({t:'fill',w,k})),[{t:'fill',w,k:n}],s.t.map(k=>({t:'tfill',w,k})),[{t:'dict',w}])});
  const mx=Math.max(...seqs.map(a=>a.length));
  for(let r=0;r<mx;r++)shuffle(seqs).forEach(a=>{if(a[r])steps.push(a[r])});
- game={id,title,words,steps,i:0,mistakes:0,dictOK:{},failed:{},used:{}};
+ game={id,title,words,steps,i:0,mistakes:0,dictOK:{},failed:{},used:{},wm:{}};
  step();
 }
 function topbar(){
@@ -186,15 +190,18 @@ function topbar(){
  <div class="bar"><i style="width:${Math.round(game.i/game.steps.length*100)}%"></i></div>
  <button class="ghost icon" onclick="toggleSoundIn()">${save.settings.sound?'🔊':'🔇'}</button></div>`}
 function toggleSoundIn(){save.settings.sound=!save.settings.sound;persist();step(true)}
-function quit(){if(confirm('بیرون برویم؟ می‌توانی بعداً از همین‌جا ادامه بدهی.')){snap();home()}}
+function quit(){if(confirm('بیرون برویم؟ می‌توانی بعداً از همین‌جا ادامه بدهی.')){snap();leave()}}
 function bubble(t,e){return `<div class="hero"><div class="chick">${e||'🐥'}</div><div class="bubble" id="bub">${t}</div></div>`}
 function say2(t,cls){const b=$('#msg');if(b){b.className='msg '+(cls||'');b.textContent=t}}
 function snap(){if(game&&game.i<game.steps.length){const g=Object.assign({},game);delete g.cur;save.resume={l:LESSON.id,g};persist()}}
-function resume_(){game=JSON.parse(JSON.stringify(save.resume.g));step()}
+function resume_(){game=JSON.parse(JSON.stringify(save.resume.g));game.wm=game.wm||{};game.used=game.used||{};
+ if(game.rev)useUnion(LESSON.id,Object.entries(game.rl).map(([w,l])=>wordOf(l,w)));
+ step()}
 function next(){game.i++;if(game.i>=game.steps.length)finish();else{snap();step()}}
 
 function step(keep){
  const s=game.steps[game.i],x=BY[s.w];
+ if(s.t==='note')return note_(s);
  if(x.lt&&(s.t==='quick'||s.t==='listen'))return lhear(s,x,keep);
  if(x.lt&&s.t==='lmatch')return lmatch(x,s.d,keep);
  if(s.t==='learn')return learn(x,keep);
@@ -223,7 +230,9 @@ function mc(s,x,keep){
  const rest=WORDS.map(a=>a.w).filter(w=>w!==x.w&&!same.includes(w));
  const kind=w=>!!BY[w].ph===!!x.ph;
  const pool=shuffle(same.filter(w=>ok(w)&&kind(w))).concat(shuffle(rest.filter(w=>ok(w)&&kind(w))),shuffle(same.filter(w=>ok(w)&&!kind(w))),shuffle(rest.filter(w=>ok(w)&&!kind(w))));
- const opts=shuffle([x.w].concat(pool.slice(0,n-1)));
+ const chosen=[],ue=new Set([x.e]),uf=new Set([x.fa]);
+ for(const w of pool){if(chosen.length>=n-1)break;const o=BY[w];if(textMode){if(uf.has(o.fa))continue;uf.add(o.fa)}else{if(ue.has(o.e))continue;ue.add(o.e)}chosen.push(w)}
+ const opts=shuffle([x.w].concat(chosen));
  game.cur={opts,err:0};
  const q=quick?'همین الان یاد گرفتی! گوش کن، معنی‌اش کدام است؟ 🧠':listen?(textMode?'گوش کن! معنی‌اش کدام است؟ 👂':'گوش کن! کدام تصویر است؟ 👂'):(textMode?'بخوان! معنی‌اش کدام است؟ 👀':'بخوان! کدام تصویر است؟ 👀');
  $('#app').innerHTML=topbar()+bubble(q)+`
@@ -239,7 +248,7 @@ function pick(i){
  const s=game.steps[game.i],c=game.cur;if(c.locked)return;
  const b=$('#o'+i);
  if(c.opts[i]===s.w){c.locked=1;b.classList.add('good');sOk();say2(rnd(PRAISE),'good-t');sayW(s.w);setTimeout(next,1100)}
- else{c.err++;if(s.t!=='quick')game.mistakes++;b.classList.add('bad','shake');b.disabled=true;sNo();say2(rnd(TRY),'bad-t');setTimeout(()=>sayW(s.w),500)}
+ else{c.err++;if(s.t!=='quick')game.mistakes++;wmiss(s.w);b.classList.add('bad','shake');b.disabled=true;sNo();say2(rnd(TRY),'bad-t');setTimeout(()=>sayW(s.w),500)}
 }
 
 /* پله ۴: جای خالی تدریجی. واحدها = حرف‌ها (کلمه) یا کلمه‌ها (عبارت). از ۱ جای خالی تا کل. */
@@ -298,7 +307,7 @@ function fillTap(i){
  if(!t||t.used||c.locked)return;
  if(norm(t.t)===norm(c.toks[c.miss[c.pos]])){t.used=true;c.pos++;tone(600+c.pos*40,.12);
   if(c.pos===c.miss.length){c.locked=1;drawFill(x);sOk();say2(rnd(PRAISE),'good-t');sayW(x.w);setTimeout(next,1200)}else drawFill(x)}
- else{c.err++;game.mistakes++;sNo();drawFill(x);say2(c.err>=2?'گزینه‌ی نورانی را بزن 👆':'این نبود، دوباره 💪','bad-t')}
+ else{c.err++;game.mistakes++;wmiss(s.w);sNo();drawFill(x);say2(c.err>=2?'گزینه‌ی نورانی را بزن 👆':'این نبود، دوباره 💪','bad-t')}
 }
 
 /* تایپ تدریجی: فقط حرف‌ها/کلمه‌های جاافتاده را تایپ می‌کند */
@@ -325,7 +334,7 @@ function tfillCheck(){
  if(!v){say2('اول بنویس 🙂');return}
  if(v===c.exp){c.locked=1;sOk();say2(c.copy?'خوب شد!':rnd(PRAISE),'good-t');sayW(x.w);setTimeout(next,1100);return}
  if(c.copy){sNo();say2('دقیقاً همین را بنویس: '+c.show,'bad-t');return}
- c.att++;game.mistakes++;sNo();$('#inp').value='';
+ c.att++;game.mistakes++;wmiss(s.w);sNo();$('#inp').value='';
  if(c.att===1){say2('نزدیک بود! دوباره گوش کن 👂','bad-t');setTimeout(()=>sayW(x.w),500)}
  else if(c.att===2){say2('حرف اول: '+c.exp[0].toUpperCase()+' 💡','bad-t');setTimeout(()=>sayW(x.w),500)}
  else{c.copy=true;say2('جواب: '+c.show+' — یک‌بار بنویسش ✏️','bad-t')}
@@ -406,7 +415,7 @@ function checkDict(){
   if(c.att===0&&!c.copy)game.dictOK[x.w]=1;
   say2(c.copy?'خوب شد! دفعه‌ی بعد راحت‌تر می‌شود.':rnd(PRAISE),'good-t');sayW(x.w);setTimeout(next,1200);return}
  if(c.copy){sNo();say2('دقیق مثل بالا بنویس 🙂','bad-t');return}
- c.att++;game.mistakes++;sNo();$('#inp').value='';
+ c.att++;game.mistakes++;wmiss(s.w);sNo();$('#inp').value='';
  const bl=$('#bl');
  if(c.att===1){bl.textContent=blanks(t);say2('نزدیک بود! '+(x.ph?'این '+t.split(' ').length+' کلمه دارد':t.replace(/ /g,'').length+' حرف دارد')+'. دوباره گوش کن 👂','bad-t');setTimeout(()=>sayW(x.w),500)}
  else if(c.att===2){bl.textContent=blanks(t,true);say2('حرف اول کمکت می‌کند 💡','bad-t');setTimeout(()=>sayW(x.w),500)}
@@ -418,14 +427,17 @@ function checkDict(){
 function finish(){
  const m=game.mistakes,n=game.words.length;
  const stars=m<=n*2?3:m<=n*5?2:1;
- game.words.forEach(w=>{const p=P(w);p.seen++;if(game.dictOK[w])p.p=Math.min(3,p.p+1)});
- if(game.id!=='review')save.stars[SK(game.id)]=Math.max(save.stars[SK(game.id)]||0,stars);
+ game.words.forEach(w=>{const p=P(w);p.seen++;if(game.dictOK[w])p.p=Math.min(3,p.p+1);
+  const e=(game.wm||{})[w]||0;
+  if(e>0){p.m=(p.m||0)+Math.min(e,3);p.lm=Date.now()}else if((p.m||0)>0&&(game.dictOK[w]||game.rev))p.m=Math.max(0,p.m-1)});
+ if(game.rev){save.revDone=save.revDone||{};save.revDone[LESSON.id]=new Date().toDateString()}
+ if(game.id!=='review'&&!game.rev)save.stars[SK(game.id)]=Math.max(save.stars[SK(game.id)]||0,stars);
  save.resume=null;persist();sWin();
  const msg=stars===3?'بی‌نقص! 🏆':stars===2?'خیلی خوب! کم‌کم استاد می‌شوی.':'تمامش کردی و این مهم‌ترین کار است! دفعه‌ی بعد بهتر می‌شود.';
  $('#app').innerHTML=`<div class="result"><div class="card"><div class="big">${'⭐'.repeat(stars)}</div><h1>${msg}</h1>
  <div class="garden" style="grid-template-columns:repeat(${Math.min(n,5)},1fr);margin:10px 0">${game.words.map(w=>`<span>${FLOWER[P(w).p]}<br><small dir="ltr" style="font-size:.7rem">${w}</small></span>`).join('')}</div>
  <p>${game.words.some(w=>game.failed[w])?'بعضی گل‌ها هنوز جوانه‌اند؛ مرور هوشمند به آن‌ها آب می‌دهد 💧':'همه‌ی گل‌ها رشد کردند!'}</p>
- <div class="row"><button onclick="home()">🏠 باغ من</button>${game.id!=='review'?`<button class="acc" onclick="start('${game.id}')">🔁 دوباره</button>`:''}</div></div></div>`;
+ <div class="row"><button onclick="leave()">🏠 باغ من</button>${game.id!=='review'&&!game.rev?`<button class="acc" onclick="start('${game.id}')">🔁 دوباره</button>`:''}</div></div></div>`;
  for(let i=0;i<22;i++){const s=document.createElement('span');s.className='conf';s.textContent=rnd(['🎉','⭐','🌸','🎈','✨']);s.style.left=Math.random()*95+'vw';s.style.animationDelay=Math.random()*1.2+'s';document.body.appendChild(s);setTimeout(()=>s.remove(),4500)}
 }
 
@@ -447,6 +459,49 @@ function parent_(){
 function setS(k,v){save.settings[k]=v;persist()}
 
 if('speechSynthesis' in window)speechSynthesis.onvoiceschanged=()=>{};
+/* ---------- مرور: چند کلمه از درس‌های قبل + چند اشتباه قبلی ---------- */
+function wmiss(w){game.wm=game.wm||{};game.wm[w]=(game.wm[w]||0)+1}
+function wordOf(lid,w){const l=LESSONS.find(l=>l.id===lid);return l.words.find(x=>x.w===w)}
+function useUnion(id,sel){
+ const idx=LESSONS.findIndex(l=>l.id===id),seen={},arr=[];
+ (sel||[]).forEach(x=>{seen[x.w]=1;arr.push(x)});
+ for(let i=idx;i>=0;i--)LESSONS[i].words.forEach(x=>{if(!seen[x.w]){seen[x.w]=1;arr.push(x)}});
+ WORDS=arr;BY=Object.fromEntries(arr.map(x=>[x.w,x]));
+}
+function reviewPlan(){
+ const idx=LESSONS.findIndex(l=>l.id===LESSON.id);
+ const st=(l,x)=>save.prog[l.id+':'+x.w]||{p:0,seen:0,m:0};
+ const A=[],taken=new Set(),prev=LESSONS.slice(0,idx).reverse(),quota=[2,1,1];
+ const cand=l=>shuffle(l.words.filter(x=>st(l,x).seen>0)).sort((a,b)=>st(l,a).p-st(l,b).p);
+ prev.slice(0,3).forEach((l,i)=>{let q=quota[i];cand(l).forEach(x=>{if(q>0&&!taken.has(x.w)){A.push(x);taken.add(x.w);q--}})});
+ if(A.length<4)prev.forEach(l=>cand(l).forEach(x=>{if(A.length<4&&!taken.has(x.w)){A.push(x);taken.add(x.w)}}));
+ const Bc=[];
+ LESSONS.slice(0,idx+1).forEach(l=>l.words.forEach(x=>{const s=st(l,x);if((s.m||0)>0&&!taken.has(x.w))Bc.push({x,s})}));
+ Bc.sort((a,b)=>(b.s.m-a.s.m)||((b.s.lm||0)-(a.s.lm||0)));
+ const B=[];Bc.forEach(o=>{if(B.length<3&&!B.some(y=>y.w===o.x.w))B.push(o.x)});
+ return{A,B};
+}
+function inter(seqs){const out=[],mx=Math.max(0,...seqs.map(a=>a.length));for(let r=0;r<mx;r++)shuffle(seqs).forEach(a=>{if(a[r])out.push(a[r])});return out}
+function startRev(){
+ const plan=reviewPlan();
+ if(!plan.A.length&&!plan.B.length){toast('هنوز چیزی برای مرور نیست؛ اول چند مأموریت انجام بده.');return}
+ const sel=plan.A.concat(plan.B);useUnion(LESSON.id,sel);
+ const A=plan.A.map(x=>x.w),B=plan.B.map(x=>x.w),steps=[];
+ const revA=w=>{const x=BY[w];if(x.lt)return[{t:'listen',w},{t:'lmatch',w,d:'ul'}];
+  return[{t:'listen',w},{t:'read',w}].concat(units(x).length>1?[{t:'tfill',w,k:1}]:[{t:'dict',w}])};
+ const revB=w=>{const x=BY[w];if(x.lt)return[{t:'learn',w},{t:'quick',w},{t:'lmatch',w,d:'ul'},{t:'lmatch',w,d:'lu'},{t:'dict',w}];
+  const n=units(x).length;return[{t:'learn',w},{t:'quick',w},{t:'fill',w,k:n>1?1:n}].concat(n>1?[{t:'tfill',w,k:1}]:[],[{t:'dict',w}])};
+ if(A.length){steps.push({t:'note',msg:'مرور چند درس قبل 🔁',sub:'چند کلمه از درس‌های قبل را سریع به یاد می‌آوریم.'});inter(A.map(revA)).forEach(s=>steps.push(s))}
+ if(B.length){steps.push({t:'note',msg:'مرور اشتباه‌های قبلی 💪',sub:'این کلمه‌ها قبلاً کمی سخت بودند؛ حالا دوباره و آهسته‌تر.'});inter(B.map(revB)).forEach(s=>steps.push(s))}
+ game={id:'rev',title:'مرور',words:A.concat(B),steps,i:0,mistakes:0,dictOK:{},failed:{},used:{},wm:{},rev:1,rl:Object.fromEntries(sel.map(x=>[x.w,x._l]))};
+ step();
+}
+function leave(){if(game&&game.rev)setLesson(LESSON.id);home()}
+function note_(s){
+ $('#app').innerHTML=topbar()+bubble(s.msg)+`<div class="card"><div class="fa">${s.sub||''}</div></div>
+ <div class="row"><button onclick="next()" style="width:100%">بزن بریم ←</button></div>`;
+}
+
 function lessons(){
  game=null;
  $('#app').innerHTML=`<div class="top"><h1 style="flex:1">ماجرای کلمه‌ها · انگلیسی هفتم</h1></div>
