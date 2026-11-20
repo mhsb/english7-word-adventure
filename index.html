@@ -133,7 +133,7 @@ const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[
 function fmt(x){if(!save.settings.syl)return esc(x.s.replace(/·/g,''));
  if(x.ph)return x.s.split(' ').map((s,i)=>`<span style="color:${C[i%4]}">${esc(s)}</span>`).join(' ');
  return x.s.split('·').map((s,i)=>`<span style="color:${C[i%4]}">${esc(s)}</span>`).join('<i>·</i>')}
-const norm=s=>String(s).toLowerCase().replace(/[’‘']/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+const norm=s=>String(s).toLowerCase().replace(/[’‘'.]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 function blanks(t,first){return t.split(' ').map(wd=>wd.split('').map((ch,i)=>first&&i===0?ch.toUpperCase():'_').join(' ')).join('   |   ')}
 const pic=x=>x.e?`<div class="pic${x.num?' num':''}">${x.e}</div>`:'';
 const PRAISE=['آفرین! 🎉','عالی بود!','دیروز نمی‌دانستی، امروز می‌دانی!','چه پیشرفتی!','درست بود! ⭐','تو می‌توانی!'];
@@ -410,7 +410,7 @@ function checkDict(){
  const s=game.steps[game.i],x=BY[s.w],c=game.cur;if(c.locked)return;
  const v=norm($('#inp').value),t=norm(x.w);
  if(!v){say2('اول بنویس 🙂');return}
- if(v===t){
+ if(v===t||v.replace(/ /g,'')===t.replace(/ /g,'')){
   c.locked=1;sOk();
   if(c.att===0&&!c.copy)game.dictOK[x.w]=1;
   say2(c.copy?'خوب شد! دفعه‌ی بعد راحت‌تر می‌شود.':rnd(PRAISE),'good-t');sayW(x.w);setTimeout(next,1200);return}
