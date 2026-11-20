@@ -69,6 +69,9 @@ h2{font-size:1.1rem;margin:16px 0 8px}
 .slot.b.on{border-bottom-color:var(--acc)}
 .tile.hint{border-color:var(--acc);animation:pulse .9s infinite}
 @keyframes pulse{50%{transform:scale(1.12)}}
+input.ghost{position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;font-size:16px;border:0;padding:0;background:transparent;color:transparent;caret-color:transparent}
+.tw{position:relative}
+.slot.h{background:#fff3c4;border-radius:8px}
 input.txt{width:100%;font-size:2rem;text-align:center;direction:ltr;padding:12px;border:3px solid #efe6cc;border-radius:16px;font-family:inherit;margin-top:10px}
 .blanks{direction:ltr;font-size:1.8rem;letter-spacing:6px;color:var(--soft);font-weight:700;min-height:2.2rem}
 .msg{min-height:2rem;font-weight:700;margin-top:8px}
@@ -310,35 +313,63 @@ function fillTap(i){
  else{c.err++;game.mistakes++;wmiss(s.w);sNo();drawFill(x);say2(c.err>=2?'گزینه‌ی نورانی را بزن 👆':'این نبود، دوباره 💪','bad-t')}
 }
 
-/* تایپ تدریجی: فقط حرف‌ها/کلمه‌های جاافتاده را تایپ می‌کند */
-function tfillStart(x,k,keep){
- const toks=units(x),n=toks.length,miss=pickMiss(x.w,n,k);
- const exp=x.ph?miss.map(i=>norm(toks[i])).join(' '):miss.map(i=>toks[i]).join('');
- const show=miss.map(i=>toks[i]).join(x.ph?' ':'');
- game.cur={miss,exp,show,att:0,copy:false};
- const slot=(t,i)=>{const m=miss.includes(i);
-  return `<div class="slot${x.ph?' w':''}${m?' b':' k'}">${m?'':esc(x.ph?t:(i===0?t.toUpperCase():t))}</div>`};
- $('#app').innerHTML=topbar()+bubble(x.ph?'کلمه‌ی جاافتاده را بنویس ⌨️':'حرف‌های جاافتاده را بنویس ⌨️')+`
- <div class="card">${pic(x)}<div class="fa${x.e?'':' big'}">${x.fa}</div>
- <div class="row"><button class="acc" onclick="${SW(x)}">🔊 بشنو</button></div>
- <div class="slots">${toks.map(slot).join('')}</div>
- <input class="txt" id="inp" type="text" dir="ltr" lang="en" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="جای خالی">
- <div class="msg" id="msg"></div>
- <div class="row"><button onclick="tfillCheck()" style="width:100%">بررسی ✔</button></div></div>`;
- $('#inp').addEventListener('keydown',e=>{if(e.key==='Enter')tfillCheck()});
- if(!keep)setTimeout(()=>{sayW(x.w);try{$('#inp').focus()}catch(e){}},400);
+/* تایپ مستقیم داخل جای خالی: فیلد خالی نداریم؛ هر حرف درست در جای خودش می‌نشیند و حرف غلط جا نمی‌گیرد، پس کلمه‌ی بی‌معنی هرگز دیده نمی‌شود */
+function typeStart(x,miss,keep,bubbleTxt,dictMode){
+ let c_kb;const toks=units(x),tgt=toks.map(t=>t.replace(/[^A-Za-z0-9]/g,''));
+ const chars=[];miss.forEach(i=>{for(let j=0;j<tgt[i].length;j++)chars.push({u:i,j})});
+ game.cur={toks,miss,tgt,chars,pos:0,wrong:0,wp:{},hinted:0,dictMode};
+ $('#app').innerHTML=topbar()+bubble(bubbleTxt)+`
+ <div class="card">${dictMode?'':pic(x)+`<div class="fa${x.e?'':' big'}">${x.fa}</div>`}
+ <div class="row"><button class="acc" style="${dictMode?'font-size:1.6rem;min-height:80px;width:100%':''}" onclick="${SW(x)}">🔊 بشنو</button></div>
+ <div class="tw"><div class="slots" id="sl"></div>
+ <input class="ghost" id="inp" type="text" dir="ltr" lang="en" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="تایپ">
+ </div><div class="msg" id="msg"></div>
+ <div class="tiles kb" id="kb"></div>
+ <div class="row"><button class="ghost" onclick="try{$('#inp').focus()}catch(e){}">⌨️ کیبورد گوشی</button></div></div>`;
+ const need=[...new Set(chars.map(e=>tgt[e.u][e.j].toLowerCase()))];
+ const pool=shuffle(LET.split('').filter(l=>!need.includes(l)));
+ const conf=need.map(l=>CONF[l]).filter(l=>l&&!need.includes(l));
+ c_kb=shuffle(need.concat([...new Set(conf)].slice(0,2),pool.slice(0,Math.max(0,Math.min(4,8-need.length)))).filter((l,i,a)=>a.indexOf(l)===i)).sort();
+ game.cur.kb=c_kb;
+ drawType(x);
+ $('#inp').addEventListener('input',typeIn);
+ if(!keep)setTimeout(()=>sayW(x.w),400);
 }
-function tfillCheck(){
- const s=game.steps[game.i],x=BY[s.w],c=game.cur;if(c.locked)return;
- let v=norm($('#inp').value);if(!x.ph)v=v.replace(/ /g,'');
- if(!v){say2('اول بنویس 🙂');return}
- if(v===c.exp){c.locked=1;sOk();say2(c.copy?'خوب شد!':rnd(PRAISE),'good-t');sayW(x.w);setTimeout(next,1100);return}
- if(c.copy){sNo();say2('دقیقاً همین را بنویس: '+c.show,'bad-t');return}
- c.att++;game.mistakes++;wmiss(s.w);sNo();$('#inp').value='';
- if(c.att===1){say2('نزدیک بود! دوباره گوش کن 👂','bad-t');setTimeout(()=>sayW(x.w),500)}
- else if(c.att===2){say2('حرف اول: '+c.exp[0].toUpperCase()+' 💡','bad-t');setTimeout(()=>sayW(x.w),500)}
- else{c.copy=true;say2('جواب: '+c.show+' — یک‌بار بنویسش ✏️','bad-t')}
- try{$('#inp').focus()}catch(e){}
+function drawType(x){
+ const c=game.cur,cu=c.chars[c.pos],curU=cu?cu.u:-1;
+ const typedOf=i=>{let k=0;c.chars.forEach((e,p)=>{if(e.u===i&&p<c.pos)k++});return k};
+ const sl=(t,i)=>{
+  if(!c.miss.includes(i))return `<div class="slot${x.ph?' w':''} k">${esc(x.ph?t:(i===0?t.toUpperCase():t))}</div>`;
+  const k=typedOf(i),str=c.tgt[i].slice(0,k),isCur=i===curU;
+  const shown=x.ph?(str+'_'.repeat(c.tgt[i].length-k)):(k?(i===0?str.toUpperCase():str):'');
+  return `<div class="slot${x.ph?' w':''} b f${isCur?' on':''}${isCur&&c.hinted&&c.hintPos===c.pos?' h':''}">${esc(shown)}</div>`};
+ $('#sl').innerHTML=c.toks.map(sl).join('');
+ const kb=$('#kb');if(kb){const want=cu?c.tgt[cu.u][cu.j].toLowerCase():'';
+  kb.innerHTML=c.kb.map(l=>`<button class="tile${c.hinted&&c.hintPos===c.pos&&l===want?' hint':''}" onclick="kbTap('${l}')">${l}</button>`).join('')}
+}
+function kbTap(l){const c=game.cur;if(!c||c.locked||!c.chars)return;typeKey(l)}
+function typeIn(){
+ const inp=$('#inp'),c=game.cur;if(!inp)return;
+ const v=inp.value;inp.value='';
+ if(!c||c.locked||!c.chars)return;
+ for(const ch of v){if(!/[A-Za-z0-9]/.test(ch))continue;typeKey(ch.toLowerCase());if(game.cur.locked)break}
+}
+function typeKey(ch){
+ const s=game.steps[game.i],x=BY[s.w],c=game.cur,e=c.chars[c.pos],want=c.tgt[e.u][e.j].toLowerCase();
+ if(ch===want){c.pos++;tone(600+c.pos*30,.1);
+  if(c.pos>=c.chars.length){c.locked=1;drawType(x);sOk();
+   if(c.dictMode&&c.wrong===0)game.dictOK[x.w]=1;
+   say2(c.wrong?'خوب شد!':rnd(PRAISE),'good-t');sayW(x.w);setTimeout(next,1200)}
+  else drawType(x);
+  return}
+ c.wrong++;game.mistakes++;wmiss(s.w);sNo();
+ c.wp[c.pos]=(c.wp[c.pos]||0)+1;
+ if(c.wp[c.pos]>=2){c.hinted=1;c.hintPos=c.pos;if(c.dictMode)game.failed[x.w]=1;say2('حرف درست: '+want.toUpperCase()+' 💡','bad-t');drawType(x)}
+ else{say2('این نبود، دوباره 💪','bad-t');setTimeout(()=>sayW(x.w),400)}
+}
+function tfillStart(x,k,keep){
+ const n=units(x).length,miss=pickMiss(x.w,n,k);
+ typeStart(x,miss,keep,x.ph?'کلمه‌ی جاافتاده را بنویس ⌨️':'حرف‌های جاافتاده را بنویس ⌨️',false);
 }
 
 /* ---------- الفبا: حرف بزرگ/کوچک، نام حرف، تشخیص شنیداری ---------- */
@@ -394,33 +425,10 @@ function abcSong(){
  go();
 }
 
-/* پله ۵: املای شنیداری */
+/* پله ۵: املای شنیداری (باز هم داخل جای‌های خالی، حرف‌به‌حرف) */
 function dict(x,keep){
- game.cur={att:0,copy:false};
- $('#app').innerHTML=topbar()+bubble(x.lt?'گوش کن و حرف را بنویس ✍️':'گوش کن و کلمه را بنویس ✍️')+`
- <div class="card"><button class="acc" style="font-size:1.6rem;min-height:80px;width:100%" onclick="${SW(x)}">🔊 بشنو</button>
- <div class="blanks" id="bl"></div>
- <input class="txt" id="inp" type="text" dir="ltr" lang="en" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="املا">
- <div class="msg" id="msg"></div>
- <div class="row"><button onclick="checkDict()" style="width:100%">بررسی ✔</button></div></div>`;
- $('#inp').addEventListener('keydown',e=>{if(e.key==='Enter')checkDict()});
- if(!keep)setTimeout(()=>{sayW(x.w);try{$('#inp').focus()}catch(e){}},400);
-}
-function checkDict(){
- const s=game.steps[game.i],x=BY[s.w],c=game.cur;if(c.locked)return;
- const v=norm($('#inp').value),t=norm(x.w);
- if(!v){say2('اول بنویس 🙂');return}
- if(v===t||v.replace(/ /g,'')===t.replace(/ /g,'')){
-  c.locked=1;sOk();
-  if(c.att===0&&!c.copy)game.dictOK[x.w]=1;
-  say2(c.copy?'خوب شد! دفعه‌ی بعد راحت‌تر می‌شود.':rnd(PRAISE),'good-t');sayW(x.w);setTimeout(next,1200);return}
- if(c.copy){sNo();say2('دقیق مثل بالا بنویس 🙂','bad-t');return}
- c.att++;game.mistakes++;wmiss(s.w);sNo();$('#inp').value='';
- const bl=$('#bl');
- if(c.att===1){bl.textContent=blanks(t);say2('نزدیک بود! '+(x.ph?'این '+t.split(' ').length+' کلمه دارد':t.replace(/ /g,'').length+' حرف دارد')+'. دوباره گوش کن 👂','bad-t');setTimeout(()=>sayW(x.w),500)}
- else if(c.att===2){bl.textContent=blanks(t,true);say2('حرف اول کمکت می‌کند 💡','bad-t');setTimeout(()=>sayW(x.w),500)}
- else{game.failed[x.w]=1;c.copy=true;bl.textContent=x.s.replace(/·/g,'');say2('این هم جواب! یک‌بار از روی آن بنویس تا یاد بگیری ✏️','bad-t')}
- try{$('#inp').focus()}catch(e){}
+ const n=units(x).length;
+ typeStart(x,[...Array(n).keys()],keep,x.lt?'گوش کن و حرف را بنویس ✍️':'گوش کن و کلمه را بنویس ✍️',true);
 }
 
 /* ---------- پایان مأموریت ---------- */
