@@ -60,6 +60,11 @@ h2{font-size:1.1rem;margin:16px 0 8px}
 .tiles{display:flex;gap:10px;justify-content:center;direction:ltr;flex-wrap:wrap;margin-top:12px}
 .tile{min-width:56px;min-height:60px;font-size:1.8rem;background:#fff;color:var(--ink);border:3px solid #efe6cc;box-shadow:0 4px 0 #e3dcc8;border-radius:16px}
 .tile.used{visibility:hidden}
+.tile.wd{font-size:1.2rem;padding:8px 14px;min-width:60px}
+.slot.w{width:auto;min-width:54px;padding:0 10px;font-size:1.5rem}
+.slot.k{color:var(--ink)}
+.slot.f{color:var(--pri)}
+.slot.b.on{border-bottom-color:var(--acc)}
 .tile.hint{border-color:var(--acc);animation:pulse .9s infinite}
 @keyframes pulse{50%{transform:scale(1.12)}}
 input.txt{width:100%;font-size:2rem;text-align:center;direction:ltr;padding:12px;border:3px solid #efe6cc;border-radius:16px;font-family:inherit;margin-top:10px}
@@ -116,6 +121,7 @@ function say(text){
   const v=speechSynthesis.getVoices().find(v=>/^en[-_]US/i.test(v.lang))||speechSynthesis.getVoices().find(v=>/^en/i.test(v.lang));
   if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
 const sayW=w=>say((BY[w]&&BY[w].say)||w);
+const SW=x=>'sayW('+JSON.stringify(x.w).replace(/"/g,'&quot;')+')';
 function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',3200)}
 
 /* ---------- ابزار ---------- */
@@ -124,7 +130,7 @@ const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[
 function fmt(x){if(!save.settings.syl)return esc(x.s.replace(/·/g,''));
  if(x.ph)return x.s.split(' ').map((s,i)=>`<span style="color:${C[i%4]}">${esc(s)}</span>`).join(' ');
  return x.s.split('·').map((s,i)=>`<span style="color:${C[i%4]}">${esc(s)}</span>`).join('<i>·</i>')}
-const norm=s=>String(s).toLowerCase().replace(/[’‘]/g,"'").replace(/[^a-z0-9' ]/g,' ').replace(/\s+/g,' ').trim();
+const norm=s=>String(s).toLowerCase().replace(/[’‘']/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 function blanks(t,first){return t.split(' ').map(wd=>wd.split('').map((ch,i)=>first&&i===0?ch.toUpperCase():'_').join(' ')).join('   |   ')}
 const pic=x=>x.e?`<div class="pic${x.num?' num':''}">${x.e}</div>`:'';
 const PRAISE=['آفرین! 🎉','عالی بود!','دیروز نمی‌دانستی، امروز می‌دانی!','چه پیشرفتی!','درست بود! ⭐','تو می‌توانی!'];
@@ -138,6 +144,7 @@ function home(){
  const total=WORDS.length,done=WORDS.filter(x=>P(x.w).p>=3).length;
  const unlocked=i=>i===0||save.unlockAll||(save.stars[SK(MISSIONS[i-1].id)]||0)>0;
  const weak=WORDS.filter(x=>P(x.w).seen>0&&P(x.w).p<3);
+ const rs=save.resume&&save.resume.l===LESSON.id?save.resume.g:null;
  $('#app').innerHTML=`
  <div class="top"><button class="ghost icon" onclick="lessons()" aria-label="درس‌ها">📚</button><h1 style="flex:1">${LESSON.title}: ${LESSON.sub}</h1>
   <button class="ghost icon" onclick="toggleSound()" aria-label="صدا">${save.settings.sound?'🔊':'🔇'}</button>
@@ -145,6 +152,7 @@ function home(){
  <div class="hero"><div class="chick">🐥</div><div class="bubble">${done?`باغ تو ${done} گل کامل دارد! ادامه بده.`:'سلام! بیا باغ کلمه‌ها را با هم پر از گل کنیم.'}</div></div>
  <div class="garden">${WORDS.map(x=>`<span title="${x.w}">${FLOWER[P(x.w).p]}</span>`).join('')}</div>
  <div style="text-align:center;color:var(--soft);font-size:.9rem;margin-top:4px">${done} از ${total} گل کامل</div>
+ ${rs?`<button class="m" style="border-color:var(--pri);margin:12px 0 0" onclick="resume_()"><span class="e">▶️</span><span class="t">ادامه‌ی مأموریت: ${esc(rs.title)}<small>گام ${rs.i+1} از ${rs.steps.length}</small></span></button>`:''}
  <h2>مأموریت‌ها</h2>
  <div class="missions">
  ${MISSIONS.map((m,i)=>{const s=save.stars[SK(m.id)]||0,u=unlocked(i);
@@ -162,8 +170,11 @@ function start(id){
  }else{const m=MISSIONS.find(m=>m.id===id);words=m.words.slice();title=m.title}
  const steps=[];
  words.forEach(w=>{steps.push({t:'learn',w});steps.push({t:'quick',w})});
- ['listen','read','build','dict'].forEach(t=>shuffle(words).forEach(w=>{if(t==='build'&&BY[w].ph)return;steps.push({t,w})}));
- game={id,title,words,steps,i:0,mistakes:0,dictOK:{},failed:{}};
+ const seqs=words.map(w=>{const n=units(BY[w]).length,s=slopes(n);
+  return [{t:'read',w}].concat(s.f.map(k=>({t:'fill',w,k})),[{t:'fill',w,k:n}],s.t.map(k=>({t:'tfill',w,k})),[{t:'dict',w}])});
+ const mx=Math.max(...seqs.map(a=>a.length));
+ for(let r=0;r<mx;r++)shuffle(seqs).forEach(a=>{if(a[r])steps.push(a[r])});
+ game={id,title,words,steps,i:0,mistakes:0,dictOK:{},failed:{},used:{}};
  step();
 }
 function topbar(){
@@ -171,16 +182,19 @@ function topbar(){
  <div class="bar"><i style="width:${Math.round(game.i/game.steps.length*100)}%"></i></div>
  <button class="ghost icon" onclick="toggleSoundIn()">${save.settings.sound?'🔊':'🔇'}</button></div>`}
 function toggleSoundIn(){save.settings.sound=!save.settings.sound;persist();step(true)}
-function quit(){if(confirm('از مأموریت بیرون برویم؟ پیشرفت این مأموریت ذخیره نمی‌شود.'))home()}
+function quit(){if(confirm('بیرون برویم؟ می‌توانی بعداً از همین‌جا ادامه بدهی.')){snap();home()}}
 function bubble(t,e){return `<div class="hero"><div class="chick">${e||'🐥'}</div><div class="bubble" id="bub">${t}</div></div>`}
 function say2(t,cls){const b=$('#msg');if(b){b.className='msg '+(cls||'');b.textContent=t}}
-function next(){game.i++;if(game.i>=game.steps.length)finish();else step()}
+function snap(){if(game&&game.i<game.steps.length){const g=Object.assign({},game);delete g.cur;save.resume={l:LESSON.id,g};persist()}}
+function resume_(){game=JSON.parse(JSON.stringify(save.resume.g));step()}
+function next(){game.i++;if(game.i>=game.steps.length)finish();else{snap();step()}}
 
 function step(keep){
  const s=game.steps[game.i],x=BY[s.w];
  if(s.t==='learn')return learn(x,keep);
  if(s.t==='listen'||s.t==='read'||s.t==='quick')return mc(s,x,keep);
- if(s.t==='build')return build(x,keep);
+ if(s.t==='fill')return fillStart(x,s.k,keep);
+ if(s.t==='tfill')return tfillStart(x,s.k,keep);
  if(s.t==='dict')return dict(x,keep);
 }
 
@@ -188,7 +202,7 @@ function step(keep){
 function learn(x,keep){
  $('#app').innerHTML=topbar()+bubble('نگاه کن، گوش بده، بعد بلند تکرار کن 🗣️')+`
  <div class="card">${pic(x)}<div class="word" dir="ltr">${fmt(x)}</div><div class="fa${x.e?'':' big'}">${x.fa}</div>${x.note?`<div style="color:var(--soft);font-size:.9rem;margin-top:6px">${x.note}</div>`:''}
- <div class="row"><button class="acc" onclick="sayW('${x.w}')">🔊 بشنو</button></div></div>
+ <div class="row"><button class="acc" onclick="${SW(x)}">🔊 بشنو</button></div></div>
  <div class="row"><button onclick="next()" style="width:100%">بلند گفتم، بعدی ←</button></div>`;
  if(!keep)setTimeout(()=>sayW(x.w),350);
 }
@@ -200,13 +214,14 @@ function mc(s,x,keep){
  const ok=w=>textMode?BY[w].fa!==x.fa:!!BY[w].e;
  const same=game.words.filter(w=>w!==x.w);
  const rest=WORDS.map(a=>a.w).filter(w=>w!==x.w&&!same.includes(w));
- const pool=shuffle(same.filter(ok)).concat(shuffle(rest.filter(ok)));
+ const kind=w=>!!BY[w].ph===!!x.ph;
+ const pool=shuffle(same.filter(w=>ok(w)&&kind(w))).concat(shuffle(rest.filter(w=>ok(w)&&kind(w))),shuffle(same.filter(w=>ok(w)&&!kind(w))),shuffle(rest.filter(w=>ok(w)&&!kind(w))));
  const opts=shuffle([x.w].concat(pool.slice(0,n-1)));
  game.cur={opts,err:0};
  const q=quick?'همین الان یاد گرفتی! گوش کن، معنی‌اش کدام است؟ 🧠':listen?(textMode?'گوش کن! معنی‌اش کدام است؟ 👂':'گوش کن! کدام تصویر است؟ 👂'):(textMode?'بخوان! معنی‌اش کدام است؟ 👀':'بخوان! کدام تصویر است؟ 👀');
  $('#app').innerHTML=topbar()+bubble(q)+`
- <div class="card">${listen?`<button class="acc" style="font-size:1.6rem;min-height:80px;width:100%" onclick="sayW('${x.w}')">🔊 دوباره بشنو</button>`
-  :`<div class="word" dir="ltr">${fmt(x)}</div><button class="ghost" onclick="sayW('${x.w}')">🔊</button>`}</div>
+ <div class="card">${listen?`<button class="acc" style="font-size:1.6rem;min-height:80px;width:100%" onclick="${SW(x)}">🔊 دوباره بشنو</button>`
+  :`<div class="word" dir="ltr">${fmt(x)}</div><button class="ghost" onclick="${SW(x)}">🔊</button>`}</div>
  <div class="opts${opts.length<3?' two':''}">${opts.map((w,i)=>{const o=BY[w];
   return textMode?`<button class="opt txt" id="o${i}" onclick="pick(${i})"><span>${o.fa}</span></button>`
   :`<button class="opt" id="o${i}" onclick="pick(${i})"><div class="pic${o.num?' num':''}">${o.e}</div><span>${o.fa}</span></button>`}).join('')}</div>
@@ -220,38 +235,101 @@ function pick(i){
  else{c.err++;if(s.t!=='quick')game.mistakes++;b.classList.add('bad','shake');b.disabled=true;sNo();say2(rnd(TRY),'bad-t');setTimeout(()=>sayW(s.w),500)}
 }
 
-/* پله ۴: چیدن حرف‌ها */
-function build(x,keep){
- const t=x.w.toLowerCase();
- game.cur={pos:0,err:0,tiles:shuffle(t.split('').map((l,i)=>({l,id:i,used:false})))};
- drawBuild(x);
+/* پله ۴: جای خالی تدریجی. واحدها = حرف‌ها (کلمه) یا کلمه‌ها (عبارت). از ۱ جای خالی تا کل. */
+const LET='abcdefghijklmnopqrstuvwxyz';
+const units=x=>x.ph?x.w.split(' '):x.w.toLowerCase().split('');
+const lc=s=>/^I'/.test(s)?s:s.toLowerCase();
+function slopes(n){
+ const x=n>=4?Math.ceil(n*.7):0,y=n>=5?Math.ceil(n*.5):0;
+ return{f:[1,1,2].concat(x>2?[x]:[]).filter(k=>k<n),t:[1].concat(y>1?[y]:[]).filter(k=>k<n)};
+}
+function pickMiss(w,n,k){
+ const all=[...Array(n).keys()];
+ if(k>=n)return all;
+ const used=(game.used[w]=game.used[w]||[]);
+ let cand=all;
+ if(k===1){const f=all.filter(i=>!used.includes(i));if(f.length)cand=f}
+ const m=shuffle(cand).slice(0,k).sort((p,q)=>p-q);
+ if(k===1)used.push(m[0]);
+ return m;
+}
+function distract(x,toks,miss,cnt){
+ const need=new Set(miss.map(i=>norm(toks[i])));
+ let pool;
+ if(x.ph){const own=new Set(toks.map(norm));const t=new Set();
+  WORDS.filter(a=>a.ph).forEach(a=>a.w.split(' ').forEach(z=>{if(!own.has(norm(z)))t.add(z)}));
+  ['the','is','are','my','your','in','you'].forEach(z=>{if(!own.has(z))t.add(z)});pool=[...t]}
+ else pool=LET.split('').filter(l=>!need.has(l));
+ return shuffle(pool).slice(0,cnt);
+}
+function fillStart(x,k,keep){
+ const toks=units(x),n=toks.length,miss=pickMiss(x.w,n,k);
+ const dis=k<n?distract(x,toks,miss,k===1?2:1):[];
+ const tiles=shuffle(miss.map(i=>toks[i]).concat(dis)).map(t=>({t:x.ph?lc(t):t,used:false}));
+ game.cur={toks,miss,pos:0,err:0,tiles,k,n};
+ drawFill(x);
  if(!keep)setTimeout(()=>sayW(x.w),350);
 }
-function drawBuild(x){
- const c=game.cur,t=x.w.toLowerCase();
- const hintL=c.err>=2&&c.pos<t.length?t[c.pos]:null;
- let hinted=false;
- $('#app').innerHTML=topbar()+bubble('حرف‌ها را به ترتیب بزن و کلمه را بساز 🧩')+`
+function drawFill(x){
+ const c=game.cur,toks=c.toks,miss=c.miss,pos=c.pos,n=c.n,k=c.k;
+ const target=pos<miss.length?norm(toks[miss[pos]]):null;
+ const hint=c.err>=2&&target!==null?c.tiles.findIndex(t=>!t.used&&norm(t.t)===target):-1;
+ const slot=(t,i)=>{const mi=miss.indexOf(i);
+  const txt=(mi<0||mi<pos)?(x.ph?t:(i===0?t.toUpperCase():t)):'';
+  const cls='slot'+(x.ph?' w':'')+(mi<0?' k':mi<pos?' f':(mi===pos?' b on':' b'));
+  return `<div class="${cls}">${esc(txt)}</div>`};
+ const q=k<n?(x.ph?'کلمه‌ی جاافتاده کدام است؟ ✏️':'حرف جاافتاده کدام است؟ ✏️'):(x.ph?'کلمه‌ها را به ترتیب بزن و عبارت را بساز 🧩':'حرف‌ها را به ترتیب بزن و کلمه را بساز 🧩');
+ $('#app').innerHTML=topbar()+bubble(q)+`
  <div class="card">${pic(x)}<div class="fa${x.e?'':' big'}">${x.fa}</div>
- <div class="row"><button class="acc" onclick="sayW('${x.w}')">🔊 بشنو</button></div>
- <div class="slots">${t.split('').map((l,i)=>`<div class="slot">${i<c.pos?(i===0?l.toUpperCase():l):''}</div>`).join('')}</div></div>
- <div class="tiles">${c.tiles.map((k,i)=>{let h='';if(hintL&&!hinted&&!k.used&&k.l===hintL){h=' hint';hinted=true}
-  return `<button class="tile${k.used?' used':''}${h}" onclick="tile(${i})">${k.l}</button>`}).join('')}</div>
+ <div class="row"><button class="acc" onclick="${SW(x)}">🔊 بشنو</button></div>
+ <div class="slots">${toks.map(slot).join('')}</div></div>
+ <div class="tiles">${c.tiles.map((t,i)=>`<button class="tile${x.ph?' wd':''}${t.used?' used':''}${i===hint?' hint':''}" onclick="fillTap(${i})">${esc(t.t)}</button>`).join('')}</div>
  <div class="msg" id="msg"></div>`;
 }
-function tile(i){
- const x=BY[game.steps[game.i].w],c=game.cur,t=x.w.toLowerCase(),k=c.tiles[i];
- if(k.used||c.locked)return;
- if(k.l===t[c.pos]){k.used=true;c.pos++;tone(600+c.pos*40,.12);
-  if(c.pos===t.length){c.locked=1;drawBuild(x);sOk();say2(rnd(PRAISE),'good-t');sayW(x.w);setTimeout(next,1200)}else drawBuild(x)}
- else{c.err++;game.mistakes++;sNo();drawBuild(x);say2(c.err>=2?'حرف نورانی را بزن 👆':'این حرف نبود، دوباره 💪','bad-t')}
+function fillTap(i){
+ const s=game.steps[game.i],x=BY[s.w],c=game.cur,t=c.tiles[i];
+ if(!t||t.used||c.locked)return;
+ if(norm(t.t)===norm(c.toks[c.miss[c.pos]])){t.used=true;c.pos++;tone(600+c.pos*40,.12);
+  if(c.pos===c.miss.length){c.locked=1;drawFill(x);sOk();say2(rnd(PRAISE),'good-t');sayW(x.w);setTimeout(next,1200)}else drawFill(x)}
+ else{c.err++;game.mistakes++;sNo();drawFill(x);say2(c.err>=2?'گزینه‌ی نورانی را بزن 👆':'این نبود، دوباره 💪','bad-t')}
+}
+
+/* تایپ تدریجی: فقط حرف‌ها/کلمه‌های جاافتاده را تایپ می‌کند */
+function tfillStart(x,k,keep){
+ const toks=units(x),n=toks.length,miss=pickMiss(x.w,n,k);
+ const exp=x.ph?miss.map(i=>norm(toks[i])).join(' '):miss.map(i=>toks[i]).join('');
+ const show=miss.map(i=>toks[i]).join(x.ph?' ':'');
+ game.cur={miss,exp,show,att:0,copy:false};
+ const slot=(t,i)=>{const m=miss.includes(i);
+  return `<div class="slot${x.ph?' w':''}${m?' b':' k'}">${m?'':esc(x.ph?t:(i===0?t.toUpperCase():t))}</div>`};
+ $('#app').innerHTML=topbar()+bubble(x.ph?'کلمه‌ی جاافتاده را بنویس ⌨️':'حرف‌های جاافتاده را بنویس ⌨️')+`
+ <div class="card">${pic(x)}<div class="fa${x.e?'':' big'}">${x.fa}</div>
+ <div class="row"><button class="acc" onclick="${SW(x)}">🔊 بشنو</button></div>
+ <div class="slots">${toks.map(slot).join('')}</div>
+ <input class="txt" id="inp" type="text" dir="ltr" lang="en" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="جای خالی">
+ <div class="msg" id="msg"></div>
+ <div class="row"><button onclick="tfillCheck()" style="width:100%">بررسی ✔</button></div></div>`;
+ $('#inp').addEventListener('keydown',e=>{if(e.key==='Enter')tfillCheck()});
+ if(!keep)setTimeout(()=>{sayW(x.w);try{$('#inp').focus()}catch(e){}},400);
+}
+function tfillCheck(){
+ const s=game.steps[game.i],x=BY[s.w],c=game.cur;if(c.locked)return;
+ let v=norm($('#inp').value);if(!x.ph)v=v.replace(/ /g,'');
+ if(!v){say2('اول بنویس 🙂');return}
+ if(v===c.exp){c.locked=1;sOk();say2(c.copy?'خوب شد!':rnd(PRAISE),'good-t');sayW(x.w);setTimeout(next,1100);return}
+ if(c.copy){sNo();say2('دقیقاً همین را بنویس: '+c.show,'bad-t');return}
+ c.att++;game.mistakes++;sNo();$('#inp').value='';
+ if(c.att===1){say2('نزدیک بود! دوباره گوش کن 👂','bad-t');setTimeout(()=>sayW(x.w),500)}
+ else if(c.att===2){say2('حرف اول: '+c.exp[0].toUpperCase()+' 💡','bad-t');setTimeout(()=>sayW(x.w),500)}
+ else{c.copy=true;say2('جواب: '+c.show+' — یک‌بار بنویسش ✏️','bad-t')}
+ try{$('#inp').focus()}catch(e){}
 }
 
 /* پله ۵: املای شنیداری */
 function dict(x,keep){
  game.cur={att:0,copy:false};
  $('#app').innerHTML=topbar()+bubble('گوش کن و کلمه را بنویس ✍️')+`
- <div class="card"><button class="acc" style="font-size:1.6rem;min-height:80px;width:100%" onclick="sayW('${x.w}')">🔊 بشنو</button>
+ <div class="card"><button class="acc" style="font-size:1.6rem;min-height:80px;width:100%" onclick="${SW(x)}">🔊 بشنو</button>
  <div class="blanks" id="bl"></div>
  <input class="txt" id="inp" type="text" dir="ltr" lang="en" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="املا">
  <div class="msg" id="msg"></div>
@@ -279,10 +357,10 @@ function checkDict(){
 /* ---------- پایان مأموریت ---------- */
 function finish(){
  const m=game.mistakes,n=game.words.length;
- const stars=m<=n?3:m<=n*2.5?2:1;
+ const stars=m<=n*2?3:m<=n*5?2:1;
  game.words.forEach(w=>{const p=P(w);p.seen++;if(game.dictOK[w])p.p=Math.min(3,p.p+1)});
  if(game.id!=='review')save.stars[SK(game.id)]=Math.max(save.stars[SK(game.id)]||0,stars);
- persist();sWin();
+ save.resume=null;persist();sWin();
  const msg=stars===3?'بی‌نقص! 🏆':stars===2?'خیلی خوب! کم‌کم استاد می‌شوی.':'تمامش کردی و این مهم‌ترین کار است! دفعه‌ی بعد بهتر می‌شود.';
  $('#app').innerHTML=`<div class="result"><div class="card"><div class="big">${'⭐'.repeat(stars)}</div><h1>${msg}</h1>
  <div class="garden" style="grid-template-columns:repeat(${Math.min(n,5)},1fr);margin:10px 0">${game.words.map(w=>`<span>${FLOWER[P(w).p]}<br><small dir="ltr" style="font-size:.7rem">${w}</small></span>`).join('')}</div>
