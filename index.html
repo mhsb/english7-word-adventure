@@ -41,12 +41,16 @@ h2{font-size:1.1rem;margin:16px 0 8px}
 .word{font-size:2.6rem;font-weight:800;direction:ltr;unicode-bidi:isolate;margin:8px 0;letter-spacing:1px}
 .word i{color:var(--soft);font-style:normal;margin:0 2px}
 .fa{font-size:1.5rem;font-weight:700;color:var(--ink)}
+.fa.big{font-size:2.1rem;color:var(--pri-d);margin:12px 0}
 .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px}
 .opts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
 .opt{background:#fff;color:var(--ink);border:3px solid #efe6cc;box-shadow:0 4px 0 #e3dcc8;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;border-radius:20px}
 .opt .pic{font-size:3rem}
 .opt .pic.num{font-size:2.2rem}
 .opt span{font-size:.9rem;font-weight:700}
+.opt.txt{min-height:92px}
+.opt.txt span{font-size:1.2rem}
+.opts.two{grid-template-columns:repeat(2,1fr)}
 .opt.good{background:var(--ok);border-color:var(--pri)}
 .opt.bad{background:var(--no);border-color:var(--bad)}
 .shake{animation:sh .35s}
@@ -122,7 +126,7 @@ function fmt(x){if(!save.settings.syl)return esc(x.s.replace(/·/g,''));
  return x.s.split('·').map((s,i)=>`<span style="color:${C[i%4]}">${esc(s)}</span>`).join('<i>·</i>')}
 const norm=s=>String(s).toLowerCase().replace(/[’‘]/g,"'").replace(/[^a-z0-9' ]/g,' ').replace(/\s+/g,' ').trim();
 function blanks(t,first){return t.split(' ').map(wd=>wd.split('').map((ch,i)=>first&&i===0?ch.toUpperCase():'_').join(' ')).join('   |   ')}
-const pic=x=>`<div class="pic${x.num?' num':''}">${x.e}</div>`;
+const pic=x=>x.e?`<div class="pic${x.num?' num':''}">${x.e}</div>`:'';
 const PRAISE=['آفرین! 🎉','عالی بود!','دیروز نمی‌دانستی، امروز می‌دانی!','چه پیشرفتی!','درست بود! ⭐','تو می‌توانی!'];
 const TRY=['نزدیک بود! دوباره امتحان کن 💪','اشکالی ندارد، یک بار دیگر گوش کن 👂','خوب تلاش کردی! دوباره'];
 const rnd=a=>a[Math.random()*a.length|0];
@@ -157,7 +161,7 @@ function start(id){
   words=WORDS.filter(x=>P(x.w).seen>0&&P(x.w).p<3).sort((a,b)=>P(a.w).p-P(b.w).p).slice(0,5).map(x=>x.w);title='مرور هوشمند'
  }else{const m=MISSIONS.find(m=>m.id===id);words=m.words.slice();title=m.title}
  const steps=[];
- words.forEach(w=>steps.push({t:'learn',w}));
+ words.forEach(w=>{steps.push({t:'learn',w});steps.push({t:'quick',w})});
  ['listen','read','build','dict'].forEach(t=>shuffle(words).forEach(w=>{if(t==='build'&&BY[w].ph)return;steps.push({t,w})}));
  game={id,title,words,steps,i:0,mistakes:0,dictOK:{},failed:{}};
  step();
@@ -175,7 +179,7 @@ function next(){game.i++;if(game.i>=game.steps.length)finish();else step()}
 function step(keep){
  const s=game.steps[game.i],x=BY[s.w];
  if(s.t==='learn')return learn(x,keep);
- if(s.t==='listen'||s.t==='read')return mc(s,x,keep);
+ if(s.t==='listen'||s.t==='read'||s.t==='quick')return mc(s,x,keep);
  if(s.t==='build')return build(x,keep);
  if(s.t==='dict')return dict(x,keep);
 }
@@ -183,7 +187,7 @@ function step(keep){
 /* پله ۱: ببین و بشنو */
 function learn(x,keep){
  $('#app').innerHTML=topbar()+bubble('نگاه کن، گوش بده، بعد بلند تکرار کن 🗣️')+`
- <div class="card">${pic(x)}<div class="word" dir="ltr">${fmt(x)}</div><div class="fa">${x.fa}</div>${x.note?`<div style="color:var(--soft);font-size:.9rem;margin-top:6px">${x.note}</div>`:''}
+ <div class="card">${pic(x)}<div class="word" dir="ltr">${fmt(x)}</div><div class="fa${x.e?'':' big'}">${x.fa}</div>${x.note?`<div style="color:var(--soft);font-size:.9rem;margin-top:6px">${x.note}</div>`:''}
  <div class="row"><button class="acc" onclick="sayW('${x.w}')">🔊 بشنو</button></div></div>
  <div class="row"><button onclick="next()" style="width:100%">بلند گفتم، بعدی ←</button></div>`;
  if(!keep)setTimeout(()=>sayW(x.w),350);
@@ -191,15 +195,21 @@ function learn(x,keep){
 
 /* پله ۲ و ۳: تشخیص شنیداری و خواندن */
 function mc(s,x,keep){
+ const quick=s.t==='quick',listen=s.t==='listen'||quick,textMode=!x.e;
+ const n=quick?2:3;
+ const ok=w=>textMode?BY[w].fa!==x.fa:!!BY[w].e;
  const same=game.words.filter(w=>w!==x.w);
- let pool=shuffle(same).concat(shuffle(WORDS.map(a=>a.w).filter(w=>w!==x.w&&!same.includes(w))));
- const opts=shuffle([x.w].concat(pool.slice(0,2)));
- game.cur={opts,err:0,dead:{}};
- const listen=s.t==='listen';
- $('#app').innerHTML=topbar()+bubble(listen?'گوش کن! کدام تصویر است؟ 👂':'بخوان! کدام تصویر است؟ 👀')+`
+ const rest=WORDS.map(a=>a.w).filter(w=>w!==x.w&&!same.includes(w));
+ const pool=shuffle(same.filter(ok)).concat(shuffle(rest.filter(ok)));
+ const opts=shuffle([x.w].concat(pool.slice(0,n-1)));
+ game.cur={opts,err:0};
+ const q=quick?'همین الان یاد گرفتی! گوش کن، معنی‌اش کدام است؟ 🧠':listen?(textMode?'گوش کن! معنی‌اش کدام است؟ 👂':'گوش کن! کدام تصویر است؟ 👂'):(textMode?'بخوان! معنی‌اش کدام است؟ 👀':'بخوان! کدام تصویر است؟ 👀');
+ $('#app').innerHTML=topbar()+bubble(q)+`
  <div class="card">${listen?`<button class="acc" style="font-size:1.6rem;min-height:80px;width:100%" onclick="sayW('${x.w}')">🔊 دوباره بشنو</button>`
   :`<div class="word" dir="ltr">${fmt(x)}</div><button class="ghost" onclick="sayW('${x.w}')">🔊</button>`}</div>
- <div class="opts">${opts.map((w,i)=>{const o=BY[w];return `<button class="opt" id="o${i}" onclick="pick(${i})"><div class="pic${o.num?' num':''}">${o.e}</div><span>${o.fa}</span></button>`}).join('')}</div>
+ <div class="opts${opts.length<3?' two':''}">${opts.map((w,i)=>{const o=BY[w];
+  return textMode?`<button class="opt txt" id="o${i}" onclick="pick(${i})"><span>${o.fa}</span></button>`
+  :`<button class="opt" id="o${i}" onclick="pick(${i})"><div class="pic${o.num?' num':''}">${o.e}</div><span>${o.fa}</span></button>`}).join('')}</div>
  <div class="msg" id="msg"></div>`;
  if(listen&&!keep)setTimeout(()=>sayW(x.w),400);
 }
@@ -207,7 +217,7 @@ function pick(i){
  const s=game.steps[game.i],c=game.cur;if(c.locked)return;
  const b=$('#o'+i);
  if(c.opts[i]===s.w){c.locked=1;b.classList.add('good');sOk();say2(rnd(PRAISE),'good-t');sayW(s.w);setTimeout(next,1100)}
- else{c.err++;game.mistakes++;b.classList.add('bad','shake');b.disabled=true;sNo();say2(rnd(TRY),'bad-t');setTimeout(()=>sayW(s.w),500)}
+ else{c.err++;if(s.t!=='quick')game.mistakes++;b.classList.add('bad','shake');b.disabled=true;sNo();say2(rnd(TRY),'bad-t');setTimeout(()=>sayW(s.w),500)}
 }
 
 /* پله ۴: چیدن حرف‌ها */
@@ -222,7 +232,7 @@ function drawBuild(x){
  const hintL=c.err>=2&&c.pos<t.length?t[c.pos]:null;
  let hinted=false;
  $('#app').innerHTML=topbar()+bubble('حرف‌ها را به ترتیب بزن و کلمه را بساز 🧩')+`
- <div class="card">${pic(x)}<div class="fa">${x.fa}</div>
+ <div class="card">${pic(x)}<div class="fa${x.e?'':' big'}">${x.fa}</div>
  <div class="row"><button class="acc" onclick="sayW('${x.w}')">🔊 بشنو</button></div>
  <div class="slots">${t.split('').map((l,i)=>`<div class="slot">${i<c.pos?(i===0?l.toUpperCase():l):''}</div>`).join('')}</div></div>
  <div class="tiles">${c.tiles.map((k,i)=>{let h='';if(hintL&&!hinted&&!k.used&&k.l===hintL){h=' hint';hinted=true}
